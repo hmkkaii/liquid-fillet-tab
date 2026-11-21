@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>液态内凹圆角标签页 · 交互动效实验室 (@设计招财头)</title>
+
+  <script>
+    // ============================================================================
+    // 🛠️ 新手 30 秒 DIY 调参区 (USER_CONFIG) —— 改完数字保存、刷新网页立刻生效！
+    // ============================================================================
+    window.USER_CONFIG = {
+      // 1. 液态反向内凹圆角半径（默认 16；试试改成 26 体验超大水滴拉丝感！）
+      MAX_FILLET_R: 16,
+
+      // 2. 向上剥离后悬浮胶囊的底角圆润度（默认 14；试试改成 22 变成全圆润胶囊）
+      MAX_BOTTOM_R: 14,
+
+      // 3. 二阶弹簧刚度与阻尼（默认 380 / 28；试试把阻尼改成 12 秒变果冻 Q 弹震荡！）
+      SPRING_STIFFNESS: 380,
+      SPRING_DAMPING: 28,
+
+      // 4. 空中横向拖拽时的物理惯性倾角上限（默认 4 度；试试改成 10 度更灵动！）
+      MAX_TILT_DEG: 4,
+
+      // 5. 完整脱离基线的垂直过渡距离（默认 36 像素）
+      PEEL_DIST: 36,
+
+      // 6. 自定义标签栏文字与多瓣徽标配色（可直接改成你的作品集栏目，如 Portfolio / Works / About）
+      TABS: [
+        {
+          id: 'general',
+          title: 'General',
+          accent: '#16A367',
+          petalColor: '#159960',
+          midColor: '#38B2AC',
+          coreColor: '#F6D07C',
+          dotColor: '#1E293B'
+        },
+        {
+          id: 'tokens',
+          title: 'Tokens',
+          accent: '#3B82F6',
+          petalColor: '#2D4A6A',
+          midColor: '#7CC4FA',
+          coreColor: '#E0F2FE',
+          dotColor: '#312E81'
+        },
+        {
+          id: 'motion',
+          title: 'Motion',
+          accent: '#F59E0B',
+          petalColor: '#B45309',
+          midColor: '#FBBF24',
+          coreColor: '#FEF3C7',
+          dotColor: '#78350F'
+        }
+      ]
+    };
+  </script>
+
+  <style>
+    :root {
+      --studio-bg: #141416;
+      --card-paper: #F3F2EE;
+      --browser-dark: #232325;
+      --canvas-white: #FFFFFF;
+      --lime-accent: #B8F34E;
+      --ink-primary: #18181B;
+      --ink-secondary: #686870;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background: var(--studio-bg);
+      color: #F4F4F6;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .studio-bar {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(32, 32, 36, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    body.pure-record .studio-bar {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(-16px);
+    }
+
+    .pure-restore-hint {
+      position: fixed;
+      top: 12px;
+      right: 14px;
+      z-index: 210;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(32, 32, 36, 0.78);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    body.pure-record .pure-restore-hint {
+      pointer-events: auto;
+    }
+
+    body.pure-record .pure-restore-hint:hover {
+      opacity: 1;
+    }
+
+    .seg-group {
+      display: flex;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 3px;
+      border-radius: 999px;
+      gap: 2px;
+    }
+
+    .studio-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: #B4B4BC;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .studio-btn:hover {
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .studio-btn.active {
+      background: #F4F4F6;
+      color: #18181B;
+      font-weight: 600;
+    }
+
+    .studio-btn.accent {
+      background: rgba(184, 243, 78, 0.16);
+      color: #C8F76E;
+      border: 1px solid rgba(184, 243, 78, 0.35);
+    }
+
+    .studio-btn.accent:hover,
+    .studio-btn.accent.running {
+      background: var(--lime-accent);
+      color: #161812;
+      border-color: var(--lime-accent);
+    }
+
+    .divider-v {
+      width: 1px;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.12);
+      margin: 0 2px;
+    }
+
+    .workspace-shell {
+      padding: 62px 20px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      transition: padding 0.25s ease;
+    }
+
+    body.pure-record .workspace-shell {
+      padding: 12px;
+    }
+
+    .xhs-frame {
+      width: 585px;
+      height: 780px;
+      background: var(--card-paper);
+      border-radius: 24px;
+      padding: 26px 24px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                  height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                  border-radius 0.3s ease;
+    }
+
+    body.pure-record .xhs-frame {
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    body.mode-wide .xhs-frame {
+      width: min(920px, 94vw);
+      height: 640px;
+      padding: 24px 28px 20px;
+    }
+
+    .frame-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+
+    .eyebrow-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .eyebrow-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: #494950;
+      background: rgba(24, 24, 27, 0.065);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .eyebrow-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10B981;
+    }
+
+    .spec-tag {
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+      font-size: 11px;
+      color: #767680;
+    }
+
+    .frame-title {
+      font-size: 22.5px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: var(--ink-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .frame-subtitle {
+      font-size: 13px;
+      color: var(--ink-secondary);
+      line-height: 1.4;
+    }
+
+    body.mode-wide .frame-header {
+      flex-direction: row;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .macro-browser {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      margin: 14px 0 14px;
+      background: var(--browser-dark);
+      border-radius: 22px;
+      display: flex;
+      overflow: hidden;
+      box-shadow: 0 20px 44px rgba(18, 18, 22, 0.18), 0 2px 6px rgba(18, 18, 22, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    }
+
+    .browser-sidebar {
+      width: 54px;
+      background: var(--browser-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 102px;
+      gap: 32px;
+      flex-shrink: 0;
+      z-index: 5;
+    }
+
+    .sidebar-glyph {
+      width: 28px;
+      height: 28px;
+      color: #A0A0A8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      transition: color 0.18s ease, background 0.18s ease;
+      cursor: pointer;
+    }
+
+    .sidebar-glyph:hover {
+      color: #E4E4EA;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .browser-main {
+      position: relative;
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .content-canvas {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 142px;
+      bottom: 0;
+      background-color: var(--canvas-white);
+      background-image: radial-gradient(#D5D6DE 1.45px, transparent 1.45px);
+      background-size: 28px 28px;
+      background-position: 22px 22px;
+      border-top-left-radius: 14px;
+      z-index: 2;
+    }
+
+    .canvas-ambient-card {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: rgba(246, 246, 249, 0.92);
+      border: 1px solid rgba(24, 24, 27, 0.06);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .ambient-badge {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #16A367;
+    }
+
+    .ambient-text {
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+      font-size: 11px;
+      color: #71717A;
+    }
+
+    .liquid-svg-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .tabs-interactive-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    .tab-item {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      padding: 0 9px 0 10px;
+      gap: 7px;
+      border-radius: 14px;
+      cursor: grab;
+      pointer-events: auto;
+      will-change: transform;
+      touch-action: none;
+    }
+
+    .tab-item:active {
+      cursor: grabbing;
+    }
+
+    .tab-item.inactive {
+      color: #A0A0AA;
+      transition: background-color 0.16s ease, color 0.16s ease;
+    }
+
+    .tab-item.inactive:hover {
+      background-color: rgba(255, 255, 255, 0.055);
+      color: #E2E2EC;
+    }
+
+    .tab-item.active {
+      color: #18181B;
+      z-index: 25;
+    }
+
+    .tab-badge {
+      width: 21px;
+      height: 21px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tab-label {
+      font-size: 14.5px;
+      font-weight: 500;
+      letter-spacing: -0.015em;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-close {
+      width: 17px;
+      height: 17px;
+      flex-shrink: 0;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8E8E98;
+      opacity: 0.72;
+      transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .tab-item.inactive .tab-close {
+      opacity: 0;
+      width: 10px;
+    }
+
+    .tab-item.inactive:hover .tab-close {
+      opacity: 0.65;
+    }
+
+    .tab-close:hover {
+      background: rgba(0, 0, 0, 0.07);
+      color: #18181B;
+      opacity: 1 !important;
+    }
+
+    .new-tab-btn {
+      position: absolute;
+      top: 102px;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: #9A9AA4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      z-index: 16;
+      transition: background 0.16s ease, color 0.16s ease, transform 0.15s ease;
+    }
+
+    .new-tab-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #F4F4F6;
+    }
+
+    .debug-capsule {
+      position: absolute;
+      left: 20px;
+      bottom: 18px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      padding: 8px 18px 8px 9px;
+      background: #48484C;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.20), 0 2px 6px rgba(0, 0, 0, 0.10);
+      cursor: pointer;
+      transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
+    }
+
+    .debug-capsule:hover {
+      background: #505055;
+      transform: translateY(-1px);
+    }
+
+    .switch-track {
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: #66666C;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      transition: background 0.2s ease;
+    }
+
+    .debug-capsule.on .switch-track {
+      background: #6B8242;
+    }
+
+    .switch-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #D8D8DE;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+      transform: translateX(0);
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.18s ease;
+    }
+
+    .debug-capsule.on .switch-thumb {
+      transform: translateX(20px);
+      background: var(--lime-accent);
+      box-shadow: 0 0 10px rgba(184, 243, 78, 0.65), 0 2px 4px rgba(0, 0, 0, 0.22);
+    }
+
+    .debug-capsule-label {
+      font-size: 14.5px;
+      font-weight: 500;
+      color: #F3F3F7;
+      letter-spacing: -0.01em;
+    }
+
+    .telemetry-hud {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      z-index: 32;
+      background: rgba(18, 20, 22, 0.92);
+      border: 1px solid rgba(184, 243, 78, 0.38);
+      border-radius: 10px;
+      padding: 6px 11px;
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #D4D4DC;
+      display: grid;
+      grid-template-columns: auto auto;
+      column-gap: 14px;
+      row-gap: 2px;
+      opacity: 0;
+      transform: translateY(-4px);
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .telemetry-hud.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hud-cell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 7px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .hud-key { color: #8E929C; }
+    .hud-val-green { color: #34D399; font-weight: 600; }
+    .hud-val-coral { color: #FB7185; font-weight: 600; }
+    .hud-val-lime  { color: var(--lime-accent); font-weight: 600; }
+    .hud-val-sky   { color: #7DD3FC; font-weight: 600; }
+
+    .slowmo-indicator {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 32;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.18);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      color: #FCD34D;
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(-4px);
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .slowmo-indicator.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .demo-cursor {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 60;
+      pointer-events: none;
+      opacity: 0;
+      will-change: transform, opacity;
+      transition: opacity 0.2s ease;
+    }
+
+    .demo-cursor.visible {
+      opacity: 1;
+    }
+
+    .cursor-press-ring {
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid var(--lime-accent);
+      background: rgba(184, 243, 78, 0.20);
+      transform: scale(0.3);
+      opacity: 0;
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .demo-cursor.pressed .cursor-press-ring {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .frame-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+      padding: 0 2px;
+    }
+
+    .footer-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill-ctrl {
+      appearance: none;
+      border: 1px solid rgba(24, 24, 27, 0.11);
+      background: #FFFFFF;
+      color: #27272A;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      transition: all 0.16s ease;
+    }
+
+    .pill-ctrl:hover {
+      border-color: rgba(24, 24, 27, 0.24);
+      transform: translateY(-1px);
+    }
+
+    .pill-ctrl.active {
+      background: #232325;
+      color: var(--lime-accent);
+      border-color: #232325;
+    }
+
+    .pill-ctrl.demo-btn {
+      background: #18181B;
+      color: #FFFFFF;
+      border-color: #18181B;
+    }
+
+    .pill-ctrl.demo-btn.running {
+      background: #3F6212;
+      color: #ECFCCB;
+      border-color: #4D7C0F;
+    }
+
+    .author-watermark {
+      font-size: 12px;
+      font-weight: 600;
+      color: #71717A;
+      letter-spacing: 0.01em;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(24, 24, 27, 0.045);
+      white-space: nowrap;
+    }
+
+    @media (max-height: 850px) {
+      .workspace-shell {
+        padding-top: 54px;
+        padding-bottom: 10px;
+      }
+      .xhs-frame {
+        transform: scale(0.92);
+        transform-origin: center center;
+      }
+      body.pure-record .xhs-frame {
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="studio-bar" id="studioBar">
+    <div class="seg-group">
+      <button class="studio-btn active" id="modeXhsBtn" type="button">竖屏 3:4 画幅</button>
+      <button class="studio-btn" id="modeWideBtn" type="button">宽屏自由实验</button>
+    </div>
+    <div class="divider-v"></div>
+    <button class="studio-btn accent" id="topDemoBtn" type="button">▶ 15s 自动演示</button>
+    <button class="studio-btn" id="topPureBtn" type="button" title="快捷键 H">沉浸无框模式 (H)</button>
+  </div>
+
+  <button class="pure-restore-hint" id="restoreBarBtn" type="button">显示顶部栏 (H / Esc)</button>
+
+  <main class="workspace-shell">
+    <section class="xhs-frame" id="xhsFrame">
+      <header class="frame-header">
+        <div class="eyebrow-row">
+          <span class="eyebrow-pill">
+            <span class="eyebrow-dot"></span>
+            UI 细节放大镜 · 动效几何实验室
+          </span>
+          <span class="spec-tag" id="headerSpecTag">R_in 16px → 0 · R_out 0 → 14px</span>
+        </div>
+        <h1 class="frame-title">为什么丝滑软件的标签页像液体？</h1>
+        <p class="frame-subtitle">按住激活标签向上或左右拖拽，观察底部反向内凹圆角的实时收拢与回弹</p>
+      </header>
+
+      <div class="macro-browser" id="macroBrowser">
+        <aside class="browser-sidebar" aria-label="Sidebar">
+          <div class="sidebar-glyph" title="Workspace">
+            <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+              <path d="M4 7.2C4 4.88 5.88 3 8.2 3H14.5C19.19 3 23 6.81 23 11.5C23 16.19 19.19 20 14.5 20H11.2C7.22 20 4 16.78 4 12.8V7.2Z" fill="currentColor" opacity="0.9"/>
+              <rect x="9.2" y="7.8" width="6.2" height="7.4" rx="2.4" fill="#232325"/>
+            </svg>
+          </div>
+          <div class="sidebar-glyph" title="Tabs">
+            <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+              <rect x="4.5" y="10.5" width="10" height="10" rx="2.8" stroke="currentColor" stroke-width="2" fill="#232325"/>
+              <rect x="8" y="7.2" width="10" height="10" rx="2.8" stroke="currentColor" stroke-width="2" fill="#232325"/>
+              <rect x="11.5" y="4" width="10" height="10" rx="2.8" stroke="currentColor" stroke-width="2" fill="#232325"/>
+            </svg>
+          </div>
+        </aside>
+
+        <div class="browser-main" id="stageMain">
+          <div class="content-canvas" id="contentCanvas">
+            <div class="canvas-ambient-card">
+              <span class="ambient-badge" id="ambientDot"></span>
+              <span class="ambient-text" id="ambientLabel">Spring(380, 28) · 60fps</span>
+            </div>
+          </div>
+
+          <svg class="liquid-svg-layer" id="liquidSvg" xmlns="http://www.w3.org/2000/svg">
+            <g id="debugStageGuides" style="display:none;"></g>
+            <path id="activeTabSurface" fill="#FFFFFF" shape-rendering="geometricPrecision" />
+            <g id="debugTabOverlay" style="display:none;"></g>
+          </svg>
+
+          <div class="tabs-interactive-layer" id="tabsLayer"></div>
+          <button class="new-tab-btn" id="newTabBtn" type="button" aria-label="Bounce tab" title="点击轻弹激活标签">
+            <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+              <path d="M9 3.2V14.8M3.2 9H14.8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+          </button>
+
+          <div class="slowmo-indicator" id="slowmoBadge">
+            <span>0.2x SLOW-MO</span>
+          </div>
+
+          <div class="telemetry-hud" id="telemetryHud">
+            <div class="hud-cell">
+              <span class="hud-key">fillet_R</span>
+              <span class="hud-val-green" id="hudFilletR">16.0px</span>
+            </div>
+            <div class="hud-cell">
+              <span class="hud-key">lift_y</span>
+              <span class="hud-val-lime" id="hudLiftY">0.0px</span>
+            </div>
+            <div class="hud-cell">
+              <span class="hud-key">bottom_R</span>
+              <span class="hud-val-coral" id="hudBottomR">0.0px</span>
+            </div>
+            <div class="hud-cell">
+              <span class="hud-key">velocity</span>
+              <span class="hud-val-sky" id="hudVelocity">0 px/s</span>
+            </div>
+          </div>
+
+          <div class="debug-capsule" id="debugCapsule" role="switch" aria-checked="false" tabindex="0">
+            <div class="switch-track">
+              <div class="switch-thumb"></div>
+            </div>
+            <span class="debug-capsule-label">Debug overlay</span>
+          </div>
+
+          <div class="demo-cursor" id="demoCursor">
+            <div class="cursor-press-ring"></div>
+            <svg width="24" height="28" viewBox="0 0 24 28" fill="none" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.32));">
+              <path d="M2.2 1.8L2.2 21.4L7.3 16.5L11.1 24.8L14.4 23.3L10.6 15.1L17.8 15.1L2.2 1.8Z" fill="#111113" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <footer class="frame-footer">
+        <div class="footer-controls">
+          <button class="pill-ctrl" id="footerDebugBtn" type="button">Debug 透视 (D)</button>
+          <button class="pill-ctrl" id="footerSlowBtn" type="button">0.2x 慢放 (S)</button>
+          <button class="pill-ctrl demo-btn" id="footerDemoBtn" type="button">▶ 自动演示</button>
+          <button class="pill-ctrl active" id="footerSoundBtn" type="button">音效 ON</button>
+        </div>
+        <span class="author-watermark">@设计招财头</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const CFG = Object.assign({
+        MAX_FILLET_R: 16,
+        MAX_BOTTOM_R: 14,
+        SPRING_STIFFNESS: 380,
+        SPRING_DAMPING: 28,
+        MAX_TILT_DEG: 4,
+        PEEL_DIST: 36,
+        TABS: []
+      }, window.USER_CONFIG || {});
+
+      // 2KB 原生 Web Audio 微交互触感合成器
+      const SoundFX = (() => {
+        let ctx = null;
+        let enabled = true;
+        function ensureCtx() {
+          if (!enabled) return null;
+          if (!ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) ctx = new AC();
+          }
+          if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+          return ctx;
+        }
+        function tone(freqStart, freqEnd, duration, type = 'sine', peakGain = 0.055) {
+          const ac = ensureCtx();
+          if (!ac || ac.state !== 'running') return;
+          const now = ac.currentTime;
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freqStart, now);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + duration);
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.linearRampToValueAtTime(peakGain, now + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          osc.connect(gain);
+          gain.connect(ac.destination);
+          osc.start(now);
+          osc.stop(now + duration + 0.005);
+        }
+        return {
+          unlock: ensureCtx,
+          setEnabled(v) { enabled = v; },
+          isEnabled() { return enabled; },
+          grab() { tone(240, 118, 0.032, 'triangle', 0.065); },
+          swap() { tone(920, 1380, 0.024, 'sine', 0.048); },
+          dock() {
+            tone(175, 285, 0.045, 'sine', 0.06);
+            setTimeout(() => tone(520, 310, 0.035, 'sine', 0.03), 14);
+          },
+          toggle(on) { tone(on ? 640 : 880, on ? 1040 : 540, 0.045, 'sine', 0.05); }
+        };
+      })();
+
+      const GEOM = {
+        Y_BASE: 142,
+        TAB_H: 50,
+        RAIL_LEFT: Math.max(28, 12 + CFG.MAX_FILLET_R),
+        TAB_GAP: 6,
+        CANVAS_TL_R: 12,
+        TOP_R: 14,
+        MAX_FILLET_R: Number(CFG.MAX_FILLET_R) || 16,
+        MAX_BOTTOM_R: Number(CFG.MAX_BOTTOM_R) || 14,
+        PEEL_DIST: Math.max(12, Number(CFG.PEEL_DIST) || 36),
+        SPRING_K: Math.max(40, Number(CFG.SPRING_STIFFNESS) || 380),
+        SPRING_C: Math.max(4, Number(CFG.SPRING_DAMPING) || 28),
+        MAX_TILT: Number(CFG.MAX_TILT_DEG) ?? 4
+      };
+
+      function makeBadgeSvg(petal, mid, core, dot) {
+        return `<svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+          <path d="M12 1.8C13.5 1.8 14.6 3.1 15.9 3.6C17.3 4.2 19.1 3.9 20.1 4.9C21.1 5.9 20.8 7.7 21.4 9.1C21.9 10.4 23.2 11.5 23.2 13C23.2 14.5 21.9 15.6 21.4 16.9C20.8 18.3 21.1 20.1 20.1 21.1C19.1 22.1 17.3 21.8 15.9 22.4C14.6 22.9 13.5 24.2 12 24.2C10.5 24.2 9.4 22.9 8.1 22.4C6.7 21.8 4.9 22.1 3.9 21.1C2.9 20.1 3.2 18.3 2.6 16.9C2.1 15.6 0.8 14.5 0.8 13C0.8 11.5 2.1 10.4 2.6 9.1C3.2 7.7 2.9 5.9 3.9 4.9C4.9 3.9 6.7 4.2 8.1 3.6C9.4 3.1 10.5 1.8 12 1.8Z" transform="translate(0 -1)" fill="${petal}"/>
+          <circle cx="12" cy="12" r="7.1" fill="${mid}"/>
+          <circle cx="12" cy="12" r="4.2" fill="${core}"/>
+          <circle cx="12" cy="12" r="1.7" fill="${dot}"/>
+        </svg>`;
+      }
+
+      const TABS_DATA = CFG.TABS.map((t, i) => ({
+        id: t.id || `tab_${i}`,
+        title: t.title || `Tab ${i + 1}`,
+        accent: t.accent || '#16A367',
+        meta: `${t.title || 'Tab'} · Spring(${GEOM.SPRING_K}, ${GEOM.SPRING_C})`,
+        badgeSvg: makeBadgeSvg(
+          t.petalColor || '#159960',
+          t.midColor || '#38B2AC',
+          t.coreColor || '#F6D07C',
+          t.dotColor || '#1E293B'
+        )
+      }));
+
+      const stageMain = document.getElementById('stageMain');
+      const tabsLayer = document.getElementById('tabsLayer');
+      const newTabBtn = document.getElementById('newTabBtn');
+      const activeTabSurface = document.getElementById('activeTabSurface');
+      const debugStageGuides = document.getElementById('debugStageGuides');
+      const debugTabOverlay = document.getElementById('debugTabOverlay');
+      const debugCapsule = document.getElementById('debugCapsule');
+      const telemetryHud = document.getElementById('telemetryHud');
+      const slowmoBadge = document.getElementById('slowmoBadge');
+      const demoCursor = document.getElementById('demoCursor');
+      const ambientDot = document.getElementById('ambientDot');
+      const ambientLabel = document.getElementById('ambientLabel');
+      const headerSpecTag = document.getElementById('headerSpecTag');
+
+      headerSpecTag.textContent = `R_in ${GEOM.MAX_FILLET_R}px → 0 · R_out 0 → ${GEOM.MAX_BOTTOM_R}px`;
+      ambientLabel.textContent = `Spring(${GEOM.SPRING_K}, ${GEOM.SPRING_C}) · 60fps`;
+
+      const hudFilletR = document.getElementById('hudFilletR');
+      const hudBottomR = document.getElementById('hudBottomR');
+      const hudLiftY = document.getElementById('hudLiftY');
+      const hudVelocity = document.getElementById('hudVelocity');
+
+      const footerDebugBtn = document.getElementById('footerDebugBtn');
+      const footerSlowBtn = document.getElementById('footerSlowBtn');
+      const footerDemoBtn = document.getElementById('footerDemoBtn');
+      const footerSoundBtn = document.getElementById('footerSoundBtn');
+      const topDemoBtn = document.getElementById('topDemoBtn');
+      const modeXhsBtn = document.getElementById('modeXhsBtn');
+      const modeWideBtn = document.getElementById('modeWideBtn');
+      const topPureBtn = document.getElementById('topPureBtn');
+      const restoreBarBtn = document.getElementById('restoreBarBtn');
+
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const smoothstep = (e0, e1, x) => {
+        const t = clamp((x - e0) / (e1 - e0), 0, 1);
+        return t * t * (3 - 2 * t);
+      };
+
+      let stageW = 483;
+      let tabW = 136;
+      let debugOn = false;
+      let slowMo = false;
+      let slotOrder = TABS_DATA.map(t => t.id);
+      let activeId = slotOrder[0];
+
+      const tabState = {};
+      const tabEls = {};
+
+      function computeLayoutMetrics() {
+        stageW = stageMain.clientWidth || 483;
+        const count = Math.max(1, TABS_DATA.length);
+        const available = stageW - GEOM.RAIL_LEFT - 36;
+        tabW = clamp(Math.floor((available - GEOM.TAB_GAP * (count - 1)) / count), 96, 188);
+        const plusX = GEOM.RAIL_LEFT + count * (tabW + GEOM.TAB_GAP) + 2;
+        newTabBtn.style.left = `${Math.min(stageW - 32, plusX)}px`;
+      }
+
+      function slotRestX(slotIdx) {
+        return GEOM.RAIL_LEFT + slotIdx * (tabW + GEOM.TAB_GAP);
+      }
+
+      TABS_DATA.forEach((item) => {
+        const el = document.createElement('div');
+        el.className = `tab-item ${item.id === activeId ? 'active' : 'inactive'}`;
+        el.dataset.id = item.id;
+        el.innerHTML = `
+          <span class="tab-badge">${item.badgeSvg}</span>
+          <span class="tab-label">${item.title}</span>
+          <span class="tab-close" data-close="${item.id}" title="轻弹测试">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+        `;
+        tabsLayer.appendChild(el);
+        tabEls[item.id] = el;
+        tabState[item.id] = { x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0, tilt: 0 };
+      });
+
+      function syncInitialPositions() {
+        computeLayoutMetrics();
+        slotOrder.forEach((id, sIdx) => {
+          const rx = slotRestX(sIdx);
+          tabState[id].x = rx;
+          tabState[id].targetX = rx;
+          tabState[id].y = 0;
+          tabState[id].targetY = 0;
+          tabEls[id].style.width = `${tabW}px`;
+        });
+      }
+
+      syncInitialPositions();
+      window.addEventListener('resize', () => {
+        computeLayoutMetrics();
+        slotOrder.forEach((id, sIdx) => {
+          tabEls[id].style.width = `${tabW}px`;
+          if (!drag.active || id !== activeId) {
+            tabState[id].targetX = slotRestX(sIdx);
+          }
+        });
+      });
+
+      function setActiveTab(id, playPop = false) {
+        if (activeId !== id) {
+          activeId = id;
+          TABS_DATA.forEach(t => {
+            tabEls[t.id].classList.toggle('active', t.id === activeId);
+            tabEls[t.id].classList.toggle('inactive', t.id !== activeId);
+            if (t.id === activeId) {
+              ambientDot.style.background = t.accent;
+              ambientLabel.textContent = t.meta;
+            }
+          });
+          if (playPop) {
+            tabState[id].vy = -155;
+            SoundFX.grab();
+          }
+        }
+      }
+
+      const drag = {
+        active: false,
+        pointerId: null,
+        startClientX: 0,
+        startClientY: 0,
+        originX: 0,
+        originY: 0,
+        wasLifted: false
+      };
+
+      tabsLayer.addEventListener('pointerdown', (e) => {
+        const closeHit = e.target.closest('[data-close]');
+        const tabEl = e.target.closest('.tab-item');
+        if (!tabEl) return;
+
+        SoundFX.unlock();
+        stopAutoDemo();
+
+        const id = tabEl.dataset.id;
+        if (closeHit) {
+          e.stopPropagation();
+          setActiveTab(id, false);
+          tabState[id].vy = -460;
+          drag.wasLifted = true;
+          SoundFX.grab();
+          return;
+        }
+
+        setActiveTab(id, false);
+        SoundFX.grab();
+
+        drag.active = true;
+        drag.pointerId = e.pointerId;
+        drag.startClientX = e.clientX;
+        drag.startClientY = e.clientY;
+        drag.originX = tabState[id].x;
+        drag.originY = tabState[id].y;
+        drag.wasLifted = false;
+        tabEl.setPointerCapture(e.pointerId);
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!drag.active || e.pointerId !== drag.pointerId) return;
+        applyDragTarget(drag.originX + (e.clientX - drag.startClientX), drag.originY + (e.clientY - drag.startClientY));
+      });
+
+      function endPointerDrag(e) {
+        if (!drag.active) return;
+        if (e && e.pointerId !== undefined && e.pointerId !== drag.pointerId) return;
+        drag.active = false;
+        drag.pointerId = null;
+        const slotIdx = slotOrder.indexOf(activeId);
+        tabState[activeId].targetX = slotRestX(slotIdx);
+        tabState[activeId].targetY = 0;
+      }
+
+      window.addEventListener('pointerup', endPointerDrag);
+      window.addEventListener('pointercancel', endPointerDrag);
+
+      newTabBtn.addEventListener('click', () => {
+        SoundFX.unlock();
+        stopAutoDemo();
+        tabState[activeId].vy = -500;
+        drag.wasLifted = true;
+        SoundFX.grab();
+      });
+
+      function applyDragTarget(rawX, rawY) {
+        const minX = 18;
+        const maxX = Math.max(minX, stageW - tabW - 18);
+        let clampedX = rawX;
+        if (rawX < minX) clampedX = minX - (minX - rawX) * 0.25;
+        if (rawX > maxX) clampedX = maxX + (rawX - maxX) * 0.25;
+
+        let mappedY = rawY;
+        if (rawY < 0 && rawY > -22) {
+          const pull = -rawY;
+          const release = smoothstep(0, 22, pull);
+          mappedY = -pull * lerp(0.68, 1.0, release);
+        }
+        mappedY = clamp(mappedY, -46, 76);
+
+        tabState[activeId].targetX = clampedX;
+        tabState[activeId].targetY = mappedY;
+
+        if (Math.abs(mappedY) > 10) drag.wasLifted = true;
+        checkNeighborSwap(clampedX);
+      }
+
+      function checkNeighborSwap(currentX) {
+        const curSlot = slotOrder.indexOf(activeId);
+        const centerX = currentX + tabW * 0.5;
+
+        if (curSlot > 0) {
+          const leftMid = slotRestX(curSlot - 1) + tabW * 0.52;
+          if (centerX < leftMid) {
+            const neighbor = slotOrder[curSlot - 1];
+            slotOrder[curSlot - 1] = activeId;
+            slotOrder[curSlot] = neighbor;
+            tabState[neighbor].targetX = slotRestX(curSlot);
+            SoundFX.swap();
+            return;
+          }
+        }
+        if (curSlot < slotOrder.length - 1) {
+          const rightMid = slotRestX(curSlot + 1) + tabW * 0.48;
+          if (centerX > rightMid) {
+            const neighbor = slotOrder[curSlot + 1];
+            slotOrder[curSlot + 1] = activeId;
+            slotOrder[curSlot] = neighbor;
+            tabState[neighbor].targetX = slotRestX(curSlot);
+            SoundFX.swap();
+          }
+        }
+      }
+
+      function computeLiquidGeometry(st) {
+        const dy = Math.abs(st.y);
+        const t = clamp(dy / GEOM.PEEL_DIST, 0, 1);
+
+        const split = 0.48;
+        let filletR = 0;
+        let bottomR = 0;
+
+        if (t < split) {
+          filletR = GEOM.MAX_FILLET_R * (1 - smoothstep(0, split, t));
+        } else {
+          bottomR = GEOM.MAX_BOTTOM_R * smoothstep(split, 1.0, t);
+        }
+
+        const leftFilletR = Math.min(filletR, Math.max(0, st.x - GEOM.CANVAS_TL_R));
+        const rightFilletR = Math.min(filletR, Math.max(0, stageW - 4 - (st.x + tabW)));
+
+        const upwardPeel = st.y < 0 ? -st.y : 0;
+        const tensionPhase = (upwardPeel > 0 && upwardPeel < 18)
+          ? Math.sin(Math.PI * (upwardPeel / 18))
+          : 0;
+        const stretchH = 3.2 * tensionPhase;
+        const meniscusBow = 2.6 * tensionPhase;
+
+        const antiSeamOverlap = (st.y <= 0.6 && dy < 1.2)
+          ? 1.8 * (1 - clamp(dy / 1.2, 0, 1))
+          : 0;
+
+        return { dy, t, filletR, leftFilletR, rightFilletR, bottomR, stretchH, meniscusBow, antiSeamOverlap };
+      }
+
+      function buildUnifiedTabPath(W, baseH, g) {
+        const rTop = GEOM.TOP_R;
+        const H = baseH + g.stretchH;
+        const rInL = g.leftFilletR;
+        const rInR = g.rightFilletR;
+        const rOut = Math.min(g.bottomR, W * 0.48, H * 0.48);
+        const overlap = g.antiSeamOverlap;
+        const bow = g.meniscusBow;
+
+        let d = `M ${rTop.toFixed(2)} 0 `;
+        d += `L ${(W - rTop).toFixed(2)} 0 `;
+        d += `A ${rTop} ${rTop} 0 0 1 ${W.toFixed(2)} ${rTop.toFixed(2)} `;
+
+        if (rOut > 0.05) {
+          d += `L ${W.toFixed(2)} ${(H - rOut).toFixed(2)} `;
+          d += `A ${rOut.toFixed(2)} ${rOut.toFixed(2)} 0 0 1 ${(W - rOut).toFixed(2)} ${H.toFixed(2)} `;
+          d += `L ${rOut.toFixed(2)} ${H.toFixed(2)} `;
+          d += `A ${rOut.toFixed(2)} ${rOut.toFixed(2)} 0 0 1 0 ${(H - rOut).toFixed(2)} `;
+        } else {
+          if (rInR > 0.05) {
+            d += `L ${W.toFixed(2)} ${(Math.max(rTop, H - rInR)).toFixed(2)} `;
+            d += `A ${rInR.toFixed(2)} ${rInR.toFixed(2)} 0 0 0 ${(W + rInR).toFixed(2)} ${H.toFixed(2)} `;
+          } else {
+            d += `L ${W.toFixed(2)} ${H.toFixed(2)} `;
+          }
+
+          const rightTipX = W + rInR;
+          const leftTipX = -rInL;
+
+          if (overlap > 0.02) {
+            const yOverlap = (H + overlap).toFixed(2);
+            d += `L ${rightTipX.toFixed(2)} ${yOverlap} `;
+            d += `L ${leftTipX.toFixed(2)} ${yOverlap} `;
+            d += `L ${leftTipX.toFixed(2)} ${H.toFixed(2)} `;
+          } else if (bow > 0.05) {
+            d += `Q ${(W * 0.5).toFixed(2)} ${(H + bow).toFixed(2)} ${leftTipX.toFixed(2)} ${H.toFixed(2)} `;
+          } else {
+            d += `L ${leftTipX.toFixed(2)} ${H.toFixed(2)} `;
+          }
+
+          if (rInL > 0.05) {
+            d += `A ${rInL.toFixed(2)} ${rInL.toFixed(2)} 0 0 0 0 ${(Math.max(rTop, H - rInL)).toFixed(2)} `;
+          }
+        }
+
+        d += `L 0 ${rTop.toFixed(2)} `;
+        d += `A ${rTop} ${rTop} 0 0 1 ${rTop.toFixed(2)} 0 Z`;
+        return d;
+      }
+
+      function renderDebugLayers(st, g) {
+        if (!debugOn) return;
+
+        const yBase = GEOM.Y_BASE;
+        const yThresh = GEOM.Y_BASE - GEOM.PEEL_DIST;
+        const tabTopY = yBase - GEOM.TAB_H + st.y;
+        const tabBottomY = tabTopY + GEOM.TAB_H + g.stretchH;
+        const centerX = st.x + tabW * 0.5;
+
+        let stageHtml = `
+          <line x1="12" y1="${yBase}" x2="${stageW - 12}" y2="${yBase}"
+                stroke="#10B981" stroke-width="1.3" stroke-dasharray="5 4" opacity="0.9"/>
+          <text x="${stageW - 14}" y="${yBase + 16}" text-anchor="end"
+                fill="#059669" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600">
+            dock baseline (0px)
+          </text>
+          <line x1="12" y1="${yThresh}" x2="${stageW - 12}" y2="${yThresh}"
+                stroke="#B8F34E" stroke-width="1" stroke-dasharray="3 4" opacity="0.45"/>
+        `;
+
+        if (g.dy > 2) {
+          const y1 = Math.min(yBase, tabBottomY);
+          const y2 = Math.max(yBase, tabBottomY);
+          stageHtml += `
+            <line x1="${centerX.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${centerX.toFixed(1)}" y2="${y2.toFixed(1)}"
+                  stroke="#B8F34E" stroke-width="1.6"/>
+            <circle cx="${centerX.toFixed(1)}" cy="${yBase}" r="3" fill="#10B981"/>
+            <circle cx="${centerX.toFixed(1)}" cy="${tabBottomY.toFixed(1)}" r="3" fill="#B8F34E"/>
+            <rect x="${(centerX - 58).toFixed(1)}" y="${yBase + 8}" width="116" height="20" rx="6"
+                  fill="#18181B" stroke="#10B981" stroke-width="1"/>
+            <text x="${centerX.toFixed(1)}" y="${yBase + 21.5}" text-anchor="middle"
+                  fill="#B8F34E" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600">
+              t=${g.t.toFixed(2)} · dy=${g.dy.toFixed(0)}px
+            </text>
+          `;
+        }
+        debugStageGuides.innerHTML = stageHtml;
+
+        const H = GEOM.TAB_H + g.stretchH;
+        const rGhost = GEOM.MAX_FILLET_R;
+        const rInL = g.leftFilletR;
+        const rInR = g.rightFilletR;
+        const rOut = g.bottomR;
+
+        let overlay = `
+          <rect x="${-rGhost}" y="${(H - rGhost).toFixed(2)}" width="${rGhost}" height="${rGhost}"
+                fill="none" stroke="#10B981" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/>
+          <rect x="${tabW}" y="${(H - rGhost).toFixed(2)}" width="${rGhost}" height="${rGhost}"
+                fill="none" stroke="#10B981" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/>
+          <rect x="0" y="0" width="${tabW}" height="${H.toFixed(2)}" rx="${GEOM.TOP_R}"
+                fill="none" stroke="rgba(59,130,246,0.42)" stroke-width="1.1" stroke-dasharray="4 3"/>
+        `;
+
+        if (rInL > 0.4) {
+          const cxL = -rInL, cyL = H - rInL;
+          overlay += `
+            <rect x="${cxL.toFixed(2)}" y="${cyL.toFixed(2)}" width="${rInL.toFixed(2)}" height="${rInL.toFixed(2)}"
+                  fill="rgba(16, 185, 129, 0.25)" stroke="#10B981" stroke-width="1.2"/>
+            <circle cx="${cxL.toFixed(2)}" cy="${cyL.toFixed(2)}" r="${rInL.toFixed(2)}"
+                    fill="rgba(16, 185, 129, 0.11)" stroke="#10B981" stroke-width="1.5" stroke-dasharray="3.5 2.5"/>
+            <line x1="${cxL.toFixed(2)}" y1="${cyL.toFixed(2)}" x2="${(cxL + rInL * 0.707).toFixed(2)}" y2="${(cyL + rInL * 0.707).toFixed(2)}"
+                  stroke="#059669" stroke-width="1.6"/>
+            <circle cx="${cxL.toFixed(2)}" cy="${cyL.toFixed(2)}" r="2.4" fill="#10B981"/>
+          `;
+        }
+
+        if (rInR > 0.4) {
+          const cxR = tabW + rInR, cyR = H - rInR;
+          overlay += `
+            <rect x="${tabW}" y="${cyR.toFixed(2)}" width="${rInR.toFixed(2)}" height="${rInR.toFixed(2)}"
+                  fill="rgba(16, 185, 129, 0.25)" stroke="#10B981" stroke-width="1.2"/>
+            <circle cx="${cxR.toFixed(2)}" cy="${cyR.toFixed(2)}" r="${rInR.toFixed(2)}"
+                    fill="rgba(16, 185, 129, 0.11)" stroke="#10B981" stroke-width="1.5" stroke-dasharray="3.5 2.5"/>
+            <line x1="${cxR.toFixed(2)}" y1="${cyR.toFixed(2)}" x2="${(cxR - rInR * 0.707).toFixed(2)}" y2="${(cyR + rInR * 0.707).toFixed(2)}"
+                  stroke="#059669" stroke-width="1.6"/>
+            <circle cx="${cxR.toFixed(2)}" cy="${cyR.toFixed(2)}" r="2.4" fill="#10B981"/>
+            <rect x="${(tabW * 0.5 - 38).toFixed(1)}" y="-22" width="76" height="17" rx="5"
+                  fill="rgba(16,185,129,0.22)" stroke="#10B981" stroke-width="1"/>
+            <text x="${(tabW * 0.5).toFixed(1)}" y="-10" text-anchor="middle"
+                  fill="#6EE7B7" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="700">
+              R_in ${g.filletR.toFixed(1)}px
+            </text>
+          `;
+        }
+
+        if (rOut > 0.4) {
+          const cyO = H - rOut, cxOL = rOut, cxOR = tabW - rOut;
+          overlay += `
+            <rect x="0" y="${cyO.toFixed(2)}" width="${rOut.toFixed(2)}" height="${rOut.toFixed(2)}"
+                  fill="rgba(244, 63, 94, 0.20)" stroke="#F43F5E" stroke-width="1.1"/>
+            <circle cx="${cxOL.toFixed(2)}" cy="${cyO.toFixed(2)}" r="${rOut.toFixed(2)}"
+                    fill="rgba(244, 63, 94, 0.12)" stroke="#F43F5E" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <line x1="${cxOL.toFixed(2)}" y1="${cyO.toFixed(2)}" x2="${(cxOL - rOut * 0.707).toFixed(2)}" y2="${(cyO + rOut * 0.707).toFixed(2)}"
+                  stroke="#E11D48" stroke-width="1.5"/>
+
+            <rect x="${cxOR.toFixed(2)}" y="${cyO.toFixed(2)}" width="${rOut.toFixed(2)}" height="${rOut.toFixed(2)}"
+                  fill="rgba(244, 63, 94, 0.20)" stroke="#F43F5E" stroke-width="1.1"/>
+            <circle cx="${cxOR.toFixed(2)}" cy="${cyO.toFixed(2)}" r="${rOut.toFixed(2)}"
+                    fill="rgba(244, 63, 94, 0.12)" stroke="#F43F5E" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <line x1="${cxOR.toFixed(2)}" y1="${cyO.toFixed(2)}" x2="${(cxOR + rOut * 0.707).toFixed(2)}" y2="${(cyO + rOut * 0.707).toFixed(2)}"
+                  stroke="#E11D48" stroke-width="1.5"/>
+            <rect x="${(tabW * 0.5 - 40).toFixed(1)}" y="-22" width="80" height="17" rx="5"
+                  fill="rgba(244,63,94,0.22)" stroke="#F43F5E" stroke-width="1"/>
+            <text x="${(tabW * 0.5).toFixed(1)}" y="-10" text-anchor="middle"
+                  fill="#FDA4AF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="700">
+              R_out ${rOut.toFixed(1)}px
+            </text>
+          `;
+        }
+
+        debugTabOverlay.innerHTML = overlay;
+      }
+
+      const autoDemo = { running: false, elapsed: 0 };
+      const cubicEaseInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+      function startAutoDemo() {
+        SoundFX.unlock();
+        autoDemo.running = true;
+        autoDemo.elapsed = 0;
+
+        slotOrder = TABS_DATA.map(t => t.id);
+        setActiveTab(slotOrder[0], false);
+        setDebugState(false, false);
+        setSlowMoState(false, false);
+        syncInitialPositions();
+
+        demoCursor.classList.add('visible');
+        footerDemoBtn.classList.add('running');
+        footerDemoBtn.textContent = '■ 演示中...';
+        topDemoBtn.classList.add('running');
+        topDemoBtn.textContent = '■ 停止演示';
+      }
+
+      function stopAutoDemo() {
+        if (!autoDemo.running) return;
+        autoDemo.running = false;
+        drag.active = false;
+        demoCursor.classList.remove('visible', 'pressed');
+        footerDemoBtn.classList.remove('running');
+        footerDemoBtn.textContent = '▶ 自动演示';
+        topDemoBtn.classList.remove('running');
+        topDemoBtn.textContent = '▶ 15s 自动演示';
+
+        const sIdx = slotOrder.indexOf(activeId);
+        tabState[activeId].targetX = slotRestX(sIdx);
+        tabState[activeId].targetY = 0;
+      }
+
+      function stepAutoDemo(rawDt) {
+        if (!autoDemo.running) return;
+        autoDemo.elapsed += rawDt;
+        const t = autoDemo.elapsed;
+
+        const s0 = slotRestX(0);
+        const s1 = slotRestX(Math.min(1, TABS_DATA.length - 1));
+        const tabRestTop = GEOM.Y_BASE - GEOM.TAB_H;
+        const grabOffsetX = tabW * 0.54;
+        const grabOffsetY = 25;
+        const capsuleX = 66;
+        const capsuleY = (stageMain.clientHeight || 540) - 36;
+
+        let cx = stageW * 0.58;
+        let cy = GEOM.Y_BASE + 120;
+        let pressed = false;
+
+        if (t < 1.0) {
+          const p = cubicEaseInOut(t / 1.0);
+          cx = lerp(stageW * 0.62, s0 + grabOffsetX, p);
+          cy = lerp(GEOM.Y_BASE + 130, tabRestTop + grabOffsetY, p);
+        } else if (t < 1.25) {
+          cx = s0 + grabOffsetX;
+          cy = tabRestTop + grabOffsetY;
+          pressed = true;
+          if (!drag.active) { drag.active = true; SoundFX.grab(); }
+          applyDragTarget(s0, 0);
+        } else if (t < 2.9) {
+          pressed = true;
+          const p = cubicEaseInOut((t - 1.25) / 1.65);
+          const sway = Math.sin((t - 1.25) * 3.8) * 18;
+          const targetX = s0 + sway;
+          const targetY = lerp(0, -40, p);
+          applyDragTarget(targetX, targetY);
+          cx = targetX + grabOffsetX;
+          cy = tabRestTop + targetY + grabOffsetY;
+        } else if (t < 4.7) {
+          pressed = true;
+          const p = cubicEaseInOut((t - 2.9) / 1.8);
+          const targetX = lerp(s0, s1 + 8, p);
+          const targetY = lerp(-40, -30, p);
+          applyDragTarget(targetX, targetY);
+          cx = targetX + grabOffsetX;
+          cy = tabRestTop + targetY + grabOffsetY;
+        } else if (t < 5.7) {
+          if (drag.active) {
+            drag.active = false;
+            drag.wasLifted = true;
+            const slotIdx = slotOrder.indexOf(activeId);
+            tabState[activeId].targetX = slotRestX(slotIdx);
+            tabState[activeId].targetY = 0;
+          }
+          const p = cubicEaseInOut((t - 4.7) / 1.0);
+          cx = lerp(s1 + grabOffsetX, capsuleX, p);
+          cy = lerp(tabRestTop + grabOffsetY, capsuleY, p);
+        } else if (t < 6.4) {
+          cx = capsuleX;
+          cy = capsuleY;
+          pressed = (t > 5.85 && t < 6.18);
+          if (t >= 5.95 && !debugOn) setDebugState(true, true);
+        } else if (t < 7.4) {
+          if (!slowMo && t >= 6.6) setSlowMoState(true, false);
+          const p = cubicEaseInOut((t - 6.4) / 1.0);
+          const curSlotX = slotRestX(slotOrder.indexOf(activeId));
+          cx = lerp(capsuleX, curSlotX + grabOffsetX, p);
+          cy = lerp(capsuleY, tabRestTop + grabOffsetY, p);
+        } else if (t < 11.6) {
+          pressed = true;
+          if (!drag.active) { drag.active = true; SoundFX.grab(); }
+          const p = cubicEaseInOut((t - 7.4) / 4.2);
+          const targetX = lerp(s1, s0, smoothstep(0.35, 0.92, p));
+          const liftCurve = p < 0.65 ? smoothstep(0, 0.65, p) : 1.0;
+          const targetY = lerp(0, -38, liftCurve);
+          applyDragTarget(targetX, targetY);
+          cx = tabState[activeId].x + grabOffsetX;
+          cy = tabRestTop + tabState[activeId].y + grabOffsetY;
+        } else if (t < 14.6) {
+          if (drag.active) {
+            drag.active = false;
+            drag.wasLifted = true;
+            const slotIdx = slotOrder.indexOf(activeId);
+            tabState[activeId].targetX = slotRestX(slotIdx);
+            tabState[activeId].targetY = 0;
+          }
+          const p = cubicEaseInOut((t - 11.6) / 3.0);
+          cx = lerp(s0 + grabOffsetX, stageW * 0.72, p);
+          cy = lerp(tabRestTop + grabOffsetY, GEOM.Y_BASE + 120, p);
+        } else {
+          setSlowMoState(false, false);
+          stopAutoDemo();
+          return;
+        }
+
+        demoCursor.classList.toggle('pressed', pressed);
+        demoCursor.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0)`;
+      }
+
+      let lastTime = performance.now();
+
+      function integrateSpring(pos, vel, target, stiffness, damping, dt) {
+        const force = -stiffness * (pos - target) - damping * vel;
+        const nextVel = vel + force * dt;
+        const nextPos = pos + nextVel * dt;
+        return [nextPos, nextVel];
+      }
+
+      function renderScene() {
+        const restTop = GEOM.Y_BASE - GEOM.TAB_H;
+        const actState = tabState[activeId];
+        const g = computeLiquidGeometry(actState);
+
+        const speedMag = Math.hypot(actState.vx, actState.vy);
+        const maxTilt = Math.abs(GEOM.MAX_TILT);
+        const tiltScale = maxTilt / 4.0;
+        const rawTilt = clamp(actState.vx * 0.0052 * tiltScale, -maxTilt, maxTilt) * smoothstep(0.28, 0.88, g.t);
+        actState.tilt = lerp(actState.tilt, rawTilt, 0.28);
+
+        TABS_DATA.forEach(item => {
+          const st = tabState[item.id];
+          const el = tabEls[item.id];
+          const topY = restTop + st.y;
+          const rot = item.id === activeId ? st.tilt : 0;
+          el.style.transform = `translate3d(${st.x.toFixed(2)}px, ${topY.toFixed(2)}px, 0) rotate(${rot.toFixed(2)}deg)`;
+        });
+
+        const pathD = buildUnifiedTabPath(tabW, GEOM.TAB_H, g);
+        const actTopY = restTop + actState.y;
+        const cx = tabW * 0.5;
+        const cy = GEOM.TAB_H * 0.5;
+        const svgTransform = `translate(${actState.x.toFixed(2)}, ${actTopY.toFixed(2)}) rotate(${actState.tilt.toFixed(2)}, ${cx.toFixed(1)}, ${cy.toFixed(1)})`;
+
+        activeTabSurface.setAttribute('d', pathD);
+        activeTabSurface.setAttribute('transform', svgTransform);
+
+        const shadowProgress = smoothstep(0.26, 1.0, g.t);
+        if (shadowProgress <= 0.005) {
+          activeTabSurface.style.filter = 'none';
+        } else {
+          const blur1 = (18 * shadowProgress).toFixed(1);
+          const y1 = (10 * shadowProgress).toFixed(1);
+          const a1 = (0.22 * shadowProgress).toFixed(3);
+          const a2 = (0.09 * shadowProgress).toFixed(3);
+          activeTabSurface.style.filter = `drop-shadow(0px ${y1}px ${blur1}px rgba(0,0,0,${a1})) drop-shadow(0px 2px 5px rgba(0,0,0,${a2}))`;
+        }
+
+        if (debugOn) {
+          debugTabOverlay.setAttribute('transform', svgTransform);
+          renderDebugLayers(actState, g);
+          hudFilletR.textContent = `${g.filletR.toFixed(1)}px`;
+          hudBottomR.textContent = `${g.bottomR.toFixed(1)}px`;
+          hudLiftY.textContent = `${(-actState.y).toFixed(1)}px`;
+          hudVelocity.textContent = `${Math.round(speedMag)} px/s`;
+        }
+      }
+
+      function tick(now) {
+        const rawDt = Math.min(0.032, Math.max(0.001, (now - lastTime) / 1000));
+        lastTime = now;
+
+        stepAutoDemo(rawDt);
+
+        const timeScale = slowMo ? 0.2 : 1.0;
+        const subDt = (rawDt * timeScale) / 3;
+
+        TABS_DATA.forEach(item => {
+          const st = tabState[item.id];
+          const isDraggedActive = (item.id === activeId && drag.active);
+          const k = isDraggedActive ? 1050 : GEOM.SPRING_K;
+          const c = isDraggedActive ? 54 : GEOM.SPRING_C;
+
+          for (let s = 0; s < 3; s++) {
+            [st.x, st.vx] = integrateSpring(st.x, st.vx, st.targetX, k, c, subDt);
+            [st.y, st.vy] = integrateSpring(st.y, st.vy, st.targetY, k, c, subDt);
+          }
+
+          if (!isDraggedActive) {
+            if (Math.abs(st.x - st.targetX) < 0.03 && Math.abs(st.vx) < 0.2) { st.x = st.targetX; st.vx = 0; }
+            if (Math.abs(st.y - st.targetY) < 0.03 && Math.abs(st.vy) < 0.2) { st.y = st.targetY; st.vy = 0; }
+          }
+        });
+
+        if (!drag.active && drag.wasLifted && Math.abs(tabState[activeId].y) < 2.2) {
+          drag.wasLifted = false;
+          SoundFX.dock();
+        }
+
+        renderScene();
+        requestAnimationFrame(tick);
+      }
+
+      function setDebugState(next, withSound = true) {
+        debugOn = next;
+        debugCapsule.classList.toggle('on', debugOn);
+        debugCapsule.setAttribute('aria-checked', String(debugOn));
+        footerDebugBtn.classList.toggle('active', debugOn);
+        telemetryHud.classList.toggle('visible', debugOn);
+        debugStageGuides.style.display = debugOn ? 'block' : 'none';
+        debugTabOverlay.style.display = debugOn ? 'block' : 'none';
+        if (withSound) SoundFX.toggle(debugOn);
+        renderScene();
+      }
+
+      function setSlowMoState(next, withSound = true) {
+        slowMo = next;
+        footerSlowBtn.classList.toggle('active', slowMo);
+        slowmoBadge.classList.toggle('visible', slowMo);
+        if (withSound) SoundFX.toggle(slowMo);
+      }
+
+      debugCapsule.addEventListener('click', () => { SoundFX.unlock(); setDebugState(!debugOn, true); });
+      debugCapsule.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDebugState(!debugOn, true); }
+      });
+      footerDebugBtn.addEventListener('click', () => { SoundFX.unlock(); setDebugState(!debugOn, true); });
+      footerSlowBtn.addEventListener('click', () => { SoundFX.unlock(); setSlowMoState(!slowMo, true); });
+      footerDemoBtn.addEventListener('click', () => { if (autoDemo.running) stopAutoDemo(); else startAutoDemo(); });
+      topDemoBtn.addEventListener('click', () => { if (autoDemo.running) stopAutoDemo(); else startAutoDemo(); });
+      footerSoundBtn.addEventListener('click', () => {
+        const next = !SoundFX.isEnabled();
+        SoundFX.setEnabled(next);
+        footerSoundBtn.classList.toggle('active', next);
+        footerSoundBtn.textContent = next ? '音效 ON' : '音效 OFF';
+        if (next) { SoundFX.unlock(); SoundFX.toggle(true); }
+      });
+
+      modeXhsBtn.addEventListener('click', () => {
+        document.body.classList.remove('mode-wide');
+        modeXhsBtn.classList.add('active');
+        modeWideBtn.classList.remove('active');
+        setTimeout(() => { computeLayoutMetrics(); syncInitialPositions(); }, 340);
+      });
+
+      modeWideBtn.addEventListener('click', () => {
+        document.body.classList.add('mode-wide');
+        modeWideBtn.classList.add('active');
+        modeXhsBtn.classList.remove('active');
+        setTimeout(() => { computeLayoutMetrics(); syncInitialPositions(); }, 340);
+      });
+
+      function togglePureRecord(force) {
+        const next = typeof force === 'boolean' ? force : !document.body.classList.contains('pure-record');
+        document.body.classList.toggle('pure-record', next);
+      }
+
+      topPureBtn.addEventListener('click', () => togglePureRecord(true));
+      restoreBarBtn.addEventListener('click', () => togglePureRecord(false));
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') togglePureRecord();
+        if (e.key === 'Escape' && document.body.classList.contains('pure-record')) togglePureRecord(false);
+        if (e.key === 'd' || e.key === 'D') setDebugState(!debugOn, true);
+        if (e.key === 's' || e.key === 'S') setSlowMoState(!slowMo, true);
+      });
+
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
