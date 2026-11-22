@@ -1,80 +1,95 @@
-# 液态内凹圆角标签页 · 开箱即玩源码与 1 分钟免费部署指南
+# Liquid-Fillet Draggable Browser Tab
 
-欢迎体验这套**纯原生 HTML + 单条闭合 SVG 动态路径 + 二阶阻尼弹簧**实现的液态浏览器标签页微交互实验室！无需安装 Node.js 或任何前端依赖，零代码基础的设计师也能 **1 秒双击把玩、30 秒魔改手感、1 分钟免费上线生成公开网页链接**。
+**Zero-dependency 60fps liquid-fillet draggable browser tab** built with a single closed SVG `<path>`, second-order damped spring physics, and a real-time tangent-circle geometry debug overlay.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Zero Dependency](https://img.shields.io/badge/Dependencies-0-brightgreen.svg)](#)
+[![Single File](https://img.shields.io/badge/Single%20File-index.html-purple.svg)](index.html)
+
+👉 **[Live Interactive Demo](https://hmkkaii.github.io/liquid-fillet-tab/)** · **[中文使用与部署指南](#中文指南)**
+
+[![Liquid-Fillet Draggable Browser Tab — 60fps SVG Spring & Debug Geometry Overlay](assets/preview.png)](https://hmkkaii.github.io/liquid-fillet-tab/)
+
+*Click the preview above to play with the live 60fps demo (press `D` for geometry tangent circles, `S` for `0.2×` slow-motion).*
 
 ---
 
-## 一、 包内文件说明
+## Why I Built This
 
-- **`index.html`**：完整单文件可交互源码（开头 **第 9～59 行** 已专门留出中文注释的 `USER_CONFIG` 新手调参区）。
-- **`01_新手必看_怎么玩与1分钟免费部署指南.pdf`**：本指南的图文精排 PDF 版。
-- **`02_底层原理_4步手搓公式与Prompt手册.pdf`**：底层数学公式拆解与 Vibe Coding 一键复刻提示词。
-- **`README.md`**：上传到 GitHub 仓库时会自动渲染为项目说明主页。
+Most browser tabs fake bottom concave corners using overlapping pseudo-elements or bitmaps, which often show hairline seams and break the moment a tab detaches mid-drag.
+
+This prototype computes the **entire tab silhouette + both concave bottom fillets (`16px`) as a single continuous closed SVG `<path>`**, driven by real **2nd-order damped spring physics** (`Spring(380, 28)`):
+
+- **Zero hairline seams**: One continuous SVG path morphs smoothly from docked concave fillets into a floating pill as you peel the tab upward.
+- **Interruptible spring reordering**: Drag horizontally across neighboring tab midlines to feel neighbors slide out of the way with velocity-preserving spring physics.
+- **Built-in Geometry Debugger (`D`)**: Toggle live emerald (`R_in`) and coral (`R_out`) tangent-circle construction overlays to inspect how the math works frame by frame.
+- **Zero dependencies, single file**: Everything lives in [`index.html`](index.html) — open it directly in any browser with no `npm install` or build step.
 
 ---
 
-## 二、 怎么玩这个项目？（2 种上手姿势）
+## Interactive Controls & Shortcuts
 
-### 玩法 1｜1 秒本地直接运行（零环境配置）
-1. 解压压缩包后，直接**双击 `index.html`**（用 Chrome、Edge 或 Safari 浏览器打开即可）。
-2. **鼠标自由交互**：
-   - 按住任意标签（如 `General`）**向上拖离**，观察底部两侧 `16px` 液态反向圆角如何像水滴一样收缩闭合为悬浮胶囊；
-   - 按住标签**左右划过隔壁标签中线**，体验真实二阶阻尼弹簧丝滑让位换槽；
-   - 点击左下角 **`Debug overlay`** 荧光绿拨杆，实时透视翡翠绿 `R_in` 与珊瑚红 `R_out` 相切辅助圆。
-3. **内置效率快捷键**：
-   - 按 **`D` 键**：一键开关 `Debug` 几何透视层
-   - 按 **`S` 键**：一键开关 `0.2x` 慢动作显微镜（物理帧步长放慢 5 倍）
-   - 按 **`H` 键**：一键隐藏顶部黑框进入沉浸录屏画幅（按 `Esc` 恢复）
+| Action / Key | Effect |
+| :--- | :--- |
+| **Drag Up** | Peel a tab out of the tab bar and watch the `16px` concave bottom fillets smoothly collapse into a floating pill |
+| **Drag Left / Right** | Reorder tabs smoothly across midlines with 2nd-order damped spring displacement |
+| **`D`** | Toggle the **Debug Geometry Overlay** (`R_in` emerald & `R_out` coral tangent circles) |
+| **`S`** | Toggle **`0.2×` Slow-Motion Microscope** (5× slower physics time step) |
+| **`H`** | Toggle clean **Screen-Recording Mode** (hides chrome; press `Esc` to restore) |
 
-### 玩法 2｜30 秒 DIY 魔改物理手感
-用 **VS Code / Cursor / 系统自带「文本编辑」或「记事本」** 打开 `index.html`，开头 **第 12 行** 就是 `window.USER_CONFIG`，改完数字保存（`Cmd+S` / `Ctrl+S`）刷新浏览器立刻生效！推荐试试这 3 组超好玩的预设配方：
+---
 
-| 预设风格 | 修改 `USER_CONFIG` 参数 | 视觉与物理手感变化 |
+## Quick Start & Physics Presets
+
+### 1. Run Locally (1 Second)
+Clone or download this repository and open [`index.html`](index.html) directly in Chrome, Safari, or Edge.
+
+```bash
+git clone https://github.com/hmkkaii/liquid-fillet-tab.git
+cd liquid-fillet-tab
+open index.html
+```
+
+### 2. Tune the Feel in 30 Seconds (`USER_CONFIG`)
+Lines **9–59** of [`index.html`](index.html) expose `window.USER_CONFIG` for instant parameter experimentation:
+
+| Preset Feel | `USER_CONFIG` Values | Visual / Tactile Behavior |
 | :--- | :--- | :--- |
-| **果冻 Q 弹震荡模式** | `SPRING_STIFFNESS: 420`<br>`SPRING_DAMPING: 11`<br>`MAX_TILT_DEG: 9` | 松手落回槽位与邻居换位时会产生明显的果冻回弹余震，空中摇摆幅度更大 |
-| **大圆角水银拉丝模式** | `MAX_FILLET_R: 26`<br>`MAX_BOTTOM_R: 22`<br>`PEEL_DIST: 44` | 贴合态底部两侧铺开 `26px` 超宽液态裙边，剥离过程拉丝感极强 |
-| **个人作品集导航栏模式** | 修改 `TABS` 数组里的 `title` 为 `'Portfolio' / 'Works' / 'About'` | 秒变你个人网站的专属液态顶部导航栏原型，可直接录屏放进作品集 |
+| **Jelly Bounce** | `SPRING_STIFFNESS: 420`, `SPRING_DAMPING: 11`, `MAX_TILT_DEG: 9` | Playful overshoot & lively tilt while dragging and snapping back |
+| **Liquid Mercury** | `MAX_FILLET_R: 26`, `MAX_BOTTOM_R: 22`, `PEEL_DIST: 44` | Deeper, more dramatic liquid-pull concave bridges while detaching |
+| **Crisp Native** | `SPRING_STIFFNESS: 380`, `SPRING_DAMPING: 28`, `MAX_TILT_DEG: 4` | Tight, high-precision native macOS/browser tab feel (default) |
 
 ---
 
-## 三、 1 分钟免费部署成公开网页链接（3 种零成本方案）
+## Repository Contents
 
-想把这个可拖拽的交互 Demo 变成一个 `https://...` 在线链接，直接嵌进你的 **Notion 作品集、Figma 原型或个人简历**？下面 3 种方案任选其一，全程 0 元：
-
-### 方法 A｜拖拽 10 秒上线（零代码推荐：Netlify Drop / EdgeOne Pages）
-适合不想注册代码仓库、希望 10 秒钟立刻拿到在线链接的朋友：
-1. 浏览器打开 **`https://app.netlify.com/drop`**（免费登录账号；国内也可搜 **EdgeOne Pages 静态托管**）。
-2. 直接把解压后的**整个源码包文件夹**（确保里面有 `index.html`）用鼠标拖进网页中央的虚线上传框。
-3. 等待约 5～10 秒，页面会自动生成一个 `https://xxx.netlify.app` 公开网址！点击 `Domain settings` 还能免费改成你喜欢的英文名前缀（如 `https://yourname-liquid-tab.netlify.app`）。
-
-### 方法 B｜GitHub Pages 永久免费托管（适合长期放简历）
-1. 登录 `github.com`，点击右上角 **`+` → `New repository`**：
-   - `Repository name` 填 `liquid-tabs-demo`
-   - 勾选 **`Public`（公开）**，点击绿色按钮 **`Create repository`**。
-2. 在新建好的仓库页面，点击 **`uploading an existing file`**（或 `Add file` → `Upload files`）。
-3. 把文件夹里的 `index.html` 和 `README.md` 拖进去，点击底部绿色按钮 **`Commit changes`**。
-4. 点击仓库顶部菜单栏的 **`Settings`** → 左侧栏找到 **`Pages`**：
-   - 在 `Build and deployment` 下，`Branch` 下拉框选择 **`main`**，点击右侧 **`Save`**。
-5. 等待约 45 秒刷新页面，顶部就会出现永久在线链接：`https://你的GitHub用户名.github.io/liquid-tabs-demo/`！
-
-### 方法 C｜Vercel 一键绑定加速（自动同步更新）
-1. 先按「方法 B」前 3 步把文件传到 GitHub 仓库。
-2. 打开 `vercel.com` 用 GitHub 账号一键登录，点击 **`Add New...` → `Project`**。
-3. 找到刚才的 `liquid-tabs-demo` 仓库点击 **`Import`**，什么配置都不用改，直接点 **`Deploy`**。
-4. 15 秒即可生成全球边缘节点加速的在线链接；以后你在 GitHub 里改任何 `USER_CONFIG` 数字，线上网页会自动同步更新！
+- [`index.html`](index.html) — Complete zero-dependency single-file source code (`USER_CONFIG` at lines 9–59).
+- [`01_How_to_Play_and_Deploy_Guide.pdf`](01_How_to_Play_and_Deploy_Guide.pdf) — Illustrated Chinese quickstart & 1-minute deployment guide.
+- [`02_Formula_and_Vibe_Coding_Prompt.pdf`](02_Formula_and_Vibe_Coding_Prompt.pdf) — 4-step mathematical derivation & Vibe Coding prompt handbook.
 
 ---
 
-## 四、 进阶玩法：用 AI 把液态标签栏移植进你的个人网站
+## Reuse & Attribution
 
-如果你想在 Cursor / Claude / Antigravity 里把这套液态标签页直接改造成你个人作品集网站的真实导航栏，把 `index.html` 拖进对话框并发送下面这段提示词即可：
+Licensed under the **[MIT License](LICENSE)** — free to study, adapt, and embed in personal or commercial projects.
 
-```markdown
-请参考我上传的 index.html 中的「单条闭合 SVG <path> 液态内凹圆角 + Spring(380, 28) 二阶弹簧」实现逻辑，帮我把它封装成一个可复用的顶部导航栏组件，接入我的个人作品集页面：
-1. 导航项改为：Works（作品集）、Playground（交互实验）、Notes（设计思考）、About（关于我）；
-2. 点击或拖拽切换标签时，下方白色点阵内容区平滑切换对应栏目的卡片内容；
-3. 保留贴合态 16px 反向内凹圆角零灰缝细节，并在右下角保留一个精致的小开关供访客开启 Debug 几何透视彩蛋。
+If you reference the SVG liquid-fillet geometry or spring-tab mechanics in a blog post, prototype, or component library, a link back is greatly appreciated:
+
+```text
+Inspired by Liquid-Fillet Tab by Zhenkai (https://github.com/hmkkaii/liquid-fillet-tab)
 ```
 
 ---
-*整理出品：@设计招财头 · UI 细节放大镜系列*
+
+<a id="中文指南"></a>
+
+## 中文指南（快速上手与二次创作）
+
+本项目使用 **纯原生 HTML + 单条闭合 SVG `<path>` + 二阶阻尼弹簧** 实现 60fps 液态内凹圆角拖拽标签页，无需 Node.js 或任何构建工具：
+
+1. **1 秒本地运行**：直接双击仓库里的 `index.html` 用浏览器打开即可交互；按 **`D`** 开关几何相切圆透视层，按 **`S`** 开关 `0.2x` 慢动作显微镜，按 **`H`** 进入纯净录屏视图。
+2. **30 秒魔改手感**：修改 `index.html` 开头第 9~59 行的 `window.USER_CONFIG`（刚度、阻尼、圆角半径、剥离距离）保存刷新即生效。
+3. **1 分钟免费部署**：Fork 本仓库后在 `Settings → Pages` 选择 `Deploy from a branch (main / root)`，约 1 分钟即可生成公开在线链接。
+4. **配套手册**：仓库内附有中文图文部署指南与 4 步数学公式 + Vibe Coding 复刻 Prompt 手册（PDF）。
+
+*Created by [Zhenkai (@hmkkaii)](https://github.com/hmkkaii) · `@设计招财头 · UI 细节放大镜系列`*
